@@ -1,0 +1,31 @@
+license = "AllRightsReserved"
+issueTrackerURL = "https://github.com/ApexStudios-Dev/GhostRenderer/issues"
+
+[[mods]]
+modId = "ghostrenderer"
+version = "${file.jarVersion}"
+displayName = "GhostRenderer"
+credits = "Apex - Programming, XFactHD - Original ghost rendering code from FramedBlocks and greatly helped with rendering issues"
+authors = "Apex, XFactHD"
+description = "GhostRenderer is a ghost rendering library for Minecraft (NeoForge), allowing you to render ghosts in-level with ease."
+#bannerFile = "banner.png"
+#iconFile = "icon.png"
+#displayURL = "https://modrinth.com/mod/ghost-renderer"
+
+[[dependencies.ghostrenderer]]
+modId = "minecraft"
+type = "required"
+versionRange = "[26.2,26.3)"
+ordering = "NONE"
+side = "BOTH"
+[[dependencies.ghostrenderer]]
+modId = "neoforge"
+type = "required"
+versionRange = "[26.2-alpha,26.3)"
+ordering = "NONE"
+side = "BOTH"
+
+[[accessTransformers]]
+file = "META-INF/accesstransformer.cfg"
+#[[mixins]]
+#config = "META-INF/ghostrenderer.mixins.json"
