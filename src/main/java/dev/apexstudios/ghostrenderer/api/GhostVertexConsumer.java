@@ -32,8 +32,8 @@ public final class GhostVertexConsumer extends VertexConsumerWrapper {
 
     public static int alpha(int a) {
         // TODO: This should be configurable
-        return 255;
-        //return (a * 190) / 0xFF;
+        // return 255;
+        return (a * 190) / 0xFF;
     }
 
     public static int color(int rgb, boolean isValid) {

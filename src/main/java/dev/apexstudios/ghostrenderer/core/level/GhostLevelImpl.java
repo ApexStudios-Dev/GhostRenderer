@@ -5,6 +5,8 @@ import dev.apexstudios.ghostrenderer.api.level.DelegatedBlockAndTintGetter;
 import dev.apexstudios.ghostrenderer.api.level.fake.FakeLevel;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
+import java.util.ArrayList;
+import java.util.List;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.block.BlockAndTintGetter;
 import net.minecraft.core.BlockPos;
@@ -17,12 +19,19 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.FluidState;
 import org.jspecify.annotations.Nullable;
 
+// TODO: We should maybe be caching block entities and entities
+// so that we are not creating new objects every frame
+// im thinking this could be keyed on the current hand and item
+// if those change clear the cache and build new objects
+// otherwise use the previous instances
 public final class GhostLevelImpl implements GhostLevel, DelegatedBlockAndTintGetter {
     private final FakeLevel reality;
     private final BlockAndTintGetter delegate;
 
     private final Long2ObjectMap<GhostBlock> blockStates = new Long2ObjectOpenHashMap<>();
     private final Long2ObjectMap<GhostBlockEntity> blockEntities = new Long2ObjectOpenHashMap<>();
+    private final List<GhostEntity> entities = new ArrayList<>();
+    private int entityCounter = 1; // 0 == invalid entity | Entity.INVALID_ENTITY_ID
 
     public GhostLevelImpl(ClientLevel reality) {
         this.reality = new FakeLevel(reality);
@@ -35,6 +44,10 @@ public final class GhostLevelImpl implements GhostLevel, DelegatedBlockAndTintGe
 
     public Long2ObjectMap<GhostBlockEntity> getBlockEntities() {
         return blockEntities;
+    }
+
+    public List<GhostEntity> getEntities() {
+        return entities;
     }
 
     @Override
@@ -96,7 +109,14 @@ public final class GhostLevelImpl implements GhostLevel, DelegatedBlockAndTintGe
 
     @Override
     public void addEntity(Entity entity, boolean isValid) {
-        // TODO
+        entities.add(new GhostEntity(entity, isValid));
+    }
+
+    @Override
+    public void fixClientEntity(Entity entity) {
+        entity.setId(entityCounter);
+
+        entityCounter++;
     }
 
     @Override

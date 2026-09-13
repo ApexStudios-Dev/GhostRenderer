@@ -28,6 +28,14 @@ public interface GhostLevel {
 
     void addEntity(Entity entity, boolean isValid);
 
+    // due to entities being constructed server side
+    // and synced to the client, some properties are
+    // only initialized and set there and need manually
+    // applying for our client usages
+    // call this method after summoning your entities
+    // but before calling `addEntity`
+    void fixClientEntity(Entity entity);
+
     static GhostLevel create(ClientLevel reality) {
         return new GhostLevelImpl(reality);
     }
