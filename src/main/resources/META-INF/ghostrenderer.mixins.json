@@ -1,0 +1,12 @@
+{
+  "$schema": "https://www.schemastore.org/sponge-mixins.json",
+  "required": true,
+  "package": "dev.apexstudios.ghostrenderer.mixin",
+  "compatibilityLevel": "JAVA_25",
+  "mixins": [
+    "LevelAccessor"
+  ],
+  "client": [],
+  "server": [],
+  "minVersion": "0.8"
+}

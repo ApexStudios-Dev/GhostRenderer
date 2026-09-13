@@ -9,9 +9,9 @@ import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.blaze3d.vertex.VertexSorting;
-import dev.apexstudios.ghostrenderer.api.GhostBlockAndTintGetter;
 import dev.apexstudios.ghostrenderer.api.GhostRenderer;
 import dev.apexstudios.ghostrenderer.api.GhostVertexConsumer;
+import dev.apexstudios.ghostrenderer.core.level.GhostLevelRenderState;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -30,6 +30,7 @@ import net.minecraft.client.renderer.feature.FeatureRendererType;
 import net.minecraft.client.renderer.feature.submit.TranslucentSubmit;
 import net.minecraft.client.renderer.rendertype.OutputTarget;
 import net.minecraft.client.renderer.texture.TextureAtlas;
+import net.minecraft.core.BlockPos;
 import net.minecraft.util.Util;
 import org.jspecify.annotations.Nullable;
 
@@ -55,24 +56,31 @@ public final class GhostFeatureRenderer implements FeatureRenderer<GhostFeatureR
         var vertexBuffer = context.stagedVertexBuffer();
         var draw = vertexBuffer.appendDraw(DefaultVertexFormat.BLOCK, PrimitiveTopology.QUADS, VertexSorting.DISTANCE_TO_ORIGIN);
         var vanillaBuffer = vertexBuffer.getVertexBuilder(draw);
+        var validBuffer = new GhostVertexConsumer(vanillaBuffer, true);
+        var invalidBuffer = new GhostVertexConsumer(vanillaBuffer, false);
 
         for(var submit : submits) {
-            submit.level.forEach((pos, ghost) -> {
-                var blockPos = submit.pose.copy();
+            var tintGetter = submit.renderState.tintGetter();
+
+            for(var entry : submit.renderState.blockStates().long2ObjectEntrySet()) {
+                var pos = BlockPos.of(entry.getLongKey());
+                var ghost = entry.getValue();
                 var blockState = ghost.blockState();
+
+                var blockPos = submit.pose.copy();
 
                 blockPos.translate(pos.getX(), pos.getY(), pos.getZ());
 
                 renderer.tesselateBlock(
-                        putQuad(new GhostVertexConsumer(vanillaBuffer, ghost.isValid()), blockPos),
+                        putQuad(ghost.isValid() ? validBuffer : invalidBuffer, blockPos),
                         0F, 0F, 0F,
-                        submit.level,
+                        tintGetter,
                         pos,
                         blockState,
                         context.blockStateModelSet().get(blockState),
-                        ghost.seed()
+                        blockState.getSeed(pos)
                 );
-            });
+            }
         }
 
         draws.add(draw);
@@ -140,13 +148,8 @@ public final class GhostFeatureRenderer implements FeatureRenderer<GhostFeatureR
 
     public record Submit(
             PoseStack.Pose pose,
-            GhostBlockAndTintGetter level
+            GhostLevelRenderState renderState
     ) implements TranslucentSubmit {
-        public Submit {
-            pose = pose.copy();
-            level = level.immutable();
-        }
-
         @Override
         public float distanceToCameraSq() {
             return TranslucentSubmit.computeDistanceToCameraSq(pose.pose(), .5F, .5F, .5F);
