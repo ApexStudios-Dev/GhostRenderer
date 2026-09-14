@@ -1,22 +1,21 @@
 package dev.apexstudios.ghostrenderer.core;
 
-import com.mojang.blaze3d.PrimitiveTopology;
-import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.textures.AddressMode;
-import com.mojang.blaze3d.textures.FilterMode;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.blaze3d.vertex.VertexSorting;
+import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
+import com.mojang.renderpearl.api.commands.RenderPass;
+import com.mojang.renderpearl.api.pipeline.PrimitiveTopology;
+import com.mojang.renderpearl.api.textures.AddressMode;
+import com.mojang.renderpearl.api.textures.FilterMode;
 import dev.apexstudios.ghostrenderer.api.GhostRenderer;
 import dev.apexstudios.ghostrenderer.api.GhostVertexConsumer;
 import dev.apexstudios.ghostrenderer.core.level.GhostLevelRenderState;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
-import java.util.OptionalDouble;
 import java.util.function.BiFunction;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.color.block.BlockColors;
@@ -28,7 +27,7 @@ import net.minecraft.client.renderer.feature.FeatureFrameContext;
 import net.minecraft.client.renderer.feature.FeatureRenderer;
 import net.minecraft.client.renderer.feature.FeatureRendererType;
 import net.minecraft.client.renderer.feature.submit.TranslucentSubmit;
-import net.minecraft.client.renderer.rendertype.OutputTarget;
+import net.minecraft.client.renderer.oit.OitStage;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.Util;
@@ -93,7 +92,7 @@ public final class GhostFeatureRenderer implements FeatureRenderer<GhostFeatureR
 
     @SuppressWarnings({"resource", "deprecation"})
     @Override
-    public void executeGroup(FeatureFrameContext context, int groupIndex, List<Submit> submits, boolean strictlyOrdered) {
+    public void executeGroup(FeatureFrameContext context, @Nullable OitStage stage, RenderPass renderPass, int groupIndex, List<Submit> submits, boolean strictlyOrdered) {
         var draw = draws.get(groupIndex);
         var executeInfo = context.stagedVertexBuffer().getExecuteInfo(draw);
 
@@ -101,35 +100,25 @@ public final class GhostFeatureRenderer implements FeatureRenderer<GhostFeatureR
             return;
         }
 
-        var target = OutputTarget.MAIN_TARGET.getRenderTarget();
+        renderPass.setPipeline(RenderSystem.getCompiledPipeline(stage == null ? RenderPipelines.TRANSLUCENT_BLOCK : RenderPipelines.OIT_TRANSLUCENT_BLOCK.getPipeline(stage)));
+        RenderSystem.bindDefaultUniforms(renderPass);
+        renderPass.setUniform("DynamicTransforms", Objects.requireNonNull(dynamicTransforms));
+        renderPass.setVertexBuffer(0, executeInfo.vertexBuffer().slice());
+        renderPass.setIndexBuffer(executeInfo.indexBuffer(), executeInfo.indexType());
 
-        try(var renderPass = RenderSystem.getDevice().createCommandEncoder().createRenderPass(
-                GhostRenderer.FEATURE_RENDERER_TYPE::name,
-                Objects.requireNonNull(target.getColorTextureView()),
-                Optional.empty(),
-                target.getDepthTextureView(),
-                OptionalDouble.empty()
-        )) {
-            renderPass.setPipeline(RenderPipelines.TRANSLUCENT_BLOCK);
-            RenderSystem.bindDefaultUniforms(renderPass);
-            renderPass.setUniform("DynamicTransforms", Objects.requireNonNull(dynamicTransforms));
-            renderPass.setVertexBuffer(0, executeInfo.vertexBuffer().slice());
-            renderPass.setIndexBuffer(executeInfo.indexBuffer(), executeInfo.indexType());
+        renderPass.setUniform(
+                "Sampler0",
+                context.textureManager().getTexture(TextureAtlas.LOCATION_BLOCKS).getTextureView(),
+                RenderSystem.getSamplerCache().getSampler(AddressMode.CLAMP_TO_EDGE, AddressMode.CLAMP_TO_EDGE, FilterMode.LINEAR, FilterMode.NEAREST, true)
+        );
 
-            renderPass.bindTexture(
-                    "Sampler0",
-                    context.textureManager().getTexture(TextureAtlas.LOCATION_BLOCKS).getTextureView(),
-                    RenderSystem.getSamplerCache().getSampler(AddressMode.CLAMP_TO_EDGE, AddressMode.CLAMP_TO_EDGE, FilterMode.LINEAR, FilterMode.NEAREST, true)
-            );
+        renderPass.setUniform(
+                "Sampler2",
+                context.lightmap(),
+                RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR)
+        );
 
-            renderPass.bindTexture(
-                    "Sampler2",
-                    context.lightmap(),
-                    RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR)
-            );
-
-            renderPass.drawIndexed(executeInfo.indexCount(), 1, executeInfo.firstIndex(), executeInfo.baseVertex(), 0);
-        }
+        renderPass.drawIndexed(executeInfo.indexCount(), 1, executeInfo.firstIndex(), executeInfo.baseVertex(), 0);
     }
 
     @Override

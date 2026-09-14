@@ -15,7 +15,7 @@ import net.minecraft.world.level.levelgen.Heightmap;
 import net.neoforged.neoforge.common.extensions.ILevelReaderExtension;
 import org.jspecify.annotations.Nullable;
 
-public interface DelegatedLevelReader extends DelegatedBlockAndLightGetter, DelegatedCollisionGetter, DelegatedSignalGetter, DelegatedNoiseBiomeSource, ILevelReaderExtension, LevelReader {
+public interface DelegatedLevelReader extends DelegatedBlockAndLightGetter, DelegatedCollisionGetter, DelegatedSignalGetter, DelegatedBiomeResolver, ILevelReaderExtension, LevelReader {
     @Override
     LevelReader delegate();
 

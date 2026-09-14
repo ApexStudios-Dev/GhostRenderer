@@ -240,7 +240,7 @@ public class FakeLevel extends DelegatedLevel {
     @Override public void setThunderLevel(float thunderLevel) {}
     @Override public void setRainLevel(float rainLevel) {}
     @Override public void globalLevelEvent(int type, BlockPos pos, int data) {}
-    @Override public void createFireworks(double x, double y, double z, double xd, double yd, double zd, List<FireworkExplosion> explosions) {}
+    @Override public void createFireworks(double x, double y, double z, double xd, double yd, double zd, List<FireworkExplosion> explosions, boolean playSound) {}
     @Override public void updateNeighbourForOutputSignal(BlockPos pos, Block changedBlock) {}
     @Override public void setSkyFlashTime(int skyFlashTime) {}
     @Override public void sendPacketToServer(Packet<?> packet) {}
