@@ -1,0 +1,138 @@
+package dev.apexstudios.ghostrenderer.core.level;
+
+import dev.apexstudios.ghostrenderer.api.GhostLevel;
+import dev.apexstudios.ghostrenderer.api.level.DelegatedBlockAndTintGetter;
+import dev.apexstudios.ghostrenderer.api.level.fake.FakeLevel;
+import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
+import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
+import java.util.ArrayList;
+import java.util.List;
+import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.client.renderer.block.BlockAndTintGetter;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.EntityBlock;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.material.FluidState;
+import org.jspecify.annotations.Nullable;
+
+// TODO: We should maybe be caching block entities and entities
+// so that we are not creating new objects every frame
+// im thinking this could be keyed on the current hand and item
+// if those change clear the cache and build new objects
+// otherwise use the previous instances
+public final class GhostLevelImpl implements GhostLevel, DelegatedBlockAndTintGetter {
+    private final FakeLevel reality;
+    private final BlockAndTintGetter delegate;
+    private final GhostedLevel ghosted;
+
+    private final Long2ObjectMap<GhostBlock> blockStates = new Long2ObjectOpenHashMap<>();
+    private final Long2ObjectMap<GhostBlockEntity> blockEntities = new Long2ObjectOpenHashMap<>();
+    private final List<GhostEntity> entities = new ArrayList<>();
+    private int entityCounter = 1; // 0 == invalid entity | Entity.INVALID_ENTITY_ID
+
+    public GhostLevelImpl(ClientLevel reality) {
+        this.reality = new FakeLevel(reality);
+        delegate = reality;
+        ghosted = new GhostedLevel(this);
+    }
+
+    public Long2ObjectMap<GhostBlock> getBlockStates() {
+        return blockStates;
+    }
+
+    public Long2ObjectMap<GhostBlockEntity> getBlockEntities() {
+        return blockEntities;
+    }
+
+    public List<GhostEntity> getEntities() {
+        return entities;
+    }
+
+    @Override
+    public Level reality() {
+        return reality;
+    }
+
+    @Override
+    public Level ghosted() {
+        return ghosted;
+    }
+
+    @Override
+    public boolean setBlockState(BlockPos pos, BlockState blockState, boolean isValid) {
+        blockStates.put(pos.asLong(), new GhostBlock(blockState, isValid));
+        return true;
+    }
+
+    @Override
+    public BlockState getBlockState(BlockPos pos) {
+        return blockStates.getOrDefault(pos.asLong(), GhostBlock.AIR).blockState();
+    }
+
+    @SuppressWarnings("DataFlowIssue")
+    @Override
+    public void setBlockEntity(BlockPos pos, BlockState blockState, @Nullable ItemStack components, boolean isValid) {
+        var key = pos.asLong();
+
+        if(blockEntities.containsKey(key)) {
+            var blockEntity = blockEntities.remove(key).blockEntity();
+            blockEntity.setLevel(null);
+            blockEntity.setRemoved();
+        }
+
+        if(!blockState.hasBlockEntity()) {
+            return;
+        }
+
+        var blockEntity = ((EntityBlock) blockState.getBlock()).newBlockEntity(pos, blockState);
+
+        if(blockEntity == null) {
+            return;
+        }
+
+        blockEntity.setLevel(reality);
+
+        if(components != null) {
+            blockEntity.applyComponentsFromItemStack(components);
+        }
+
+        blockEntities.put(key, new GhostBlockEntity(blockEntity, isValid));
+    }
+
+    @Override
+    public @Nullable BlockEntity getBlockEntity(BlockPos pos) {
+        var key = pos.asLong();
+
+        if(blockEntities.containsKey(key)) {
+            return blockEntities.get(key).blockEntity();
+        }
+
+        return null;
+    }
+
+    @Override
+    public void addEntity(Entity entity, boolean isValid) {
+        entities.add(new GhostEntity(entity, isValid));
+    }
+
+    @Override
+    public void fixClientEntity(Entity entity) {
+        entity.setId(entityCounter);
+
+        entityCounter++;
+    }
+
+    @Override
+    public BlockAndTintGetter delegate() {
+        return delegate;
+    }
+
+    @Override
+    public FluidState getFluidState(BlockPos pos) {
+        return getBlockState(pos).getFluidState();
+    }
+}
