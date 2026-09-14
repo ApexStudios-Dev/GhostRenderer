@@ -31,17 +31,10 @@ public sealed class GhostOrderedSubmitNodeCollector implements DelegatedOrderedS
         submitGhostGeometryStack(poseStack, renderType, sprite, (ghosePoseStack, buffer) -> renderer.render(ghosePoseStack.last(), buffer));
     }
 
-    @SuppressWarnings("deprecation")
     public void submitGhostGeometryStack(PoseStack poseStack, RenderType renderType, @Nullable TextureAtlasSprite sprite, BiConsumer<PoseStack, VertexConsumer> renderer) {
-        var atlas = TextureAtlas.LOCATION_BLOCKS;
+        var atlas = atlas(renderType);
 
-        if(sprite == null) {
-            var sampler = renderType.state.textures.get("Sampler0");
-
-            if(sampler != null) {
-                atlas = sampler.location();
-            }
-        } else {
+        if(sprite != null) {
             atlas = sprite.atlasLocation();
         }
 
@@ -76,7 +69,7 @@ public sealed class GhostOrderedSubmitNodeCollector implements DelegatedOrderedS
 
     @Override
     public <S> void submitModel(Model<? super S> model, S state, PoseStack poseStack, RenderType renderType, int lightCoords, int overlayCoords, int tintedColor, @Nullable UvMapping uvMapping, int outlineColor) {
-        submitGhostGeometryStack(poseStack, TextureAtlas.LOCATION_BLOCKS, uvMapping, (ghostPoseStack, buffer) -> {
+        submitGhostGeometryStack(poseStack, atlas(renderType), uvMapping, (ghostPoseStack, buffer) -> {
             model.setupAnim(state);
             model.renderToBuffer(ghostPoseStack, buffer, lightCoords, overlayCoords, tintedColor);
         });
@@ -85,5 +78,15 @@ public sealed class GhostOrderedSubmitNodeCollector implements DelegatedOrderedS
     @Override
     public void submitCustomGeometry(PoseStack poseStack, RenderType renderType, SubmitNodeCollector.CustomGeometryRenderer renderer) {
         submitGhostGeometry(poseStack, renderType, null, renderer);
+    }
+
+    private Identifier atlas(RenderType renderType) {
+        var sampler = renderType.state.textures.get("Sampler0");
+
+        if(sampler != null) {
+            return sampler.location();
+        }
+
+        return TextureAtlas.LOCATION_BLOCKS;
     }
 }
