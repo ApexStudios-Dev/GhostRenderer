@@ -14,6 +14,8 @@ import org.jspecify.annotations.Nullable;
 public interface GhostLevel {
     Level reality();
 
+    Level ghosted();
+
     boolean setBlockState(BlockPos pos, BlockState blockState, boolean isValid);
 
     BlockState getBlockState(BlockPos pos);

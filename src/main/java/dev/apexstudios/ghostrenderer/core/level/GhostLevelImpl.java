@@ -27,6 +27,7 @@ import org.jspecify.annotations.Nullable;
 public final class GhostLevelImpl implements GhostLevel, DelegatedBlockAndTintGetter {
     private final FakeLevel reality;
     private final BlockAndTintGetter delegate;
+    private final GhostedLevel ghosted;
 
     private final Long2ObjectMap<GhostBlock> blockStates = new Long2ObjectOpenHashMap<>();
     private final Long2ObjectMap<GhostBlockEntity> blockEntities = new Long2ObjectOpenHashMap<>();
@@ -36,6 +37,7 @@ public final class GhostLevelImpl implements GhostLevel, DelegatedBlockAndTintGe
     public GhostLevelImpl(ClientLevel reality) {
         this.reality = new FakeLevel(reality);
         delegate = reality;
+        ghosted = new GhostedLevel(this);
     }
 
     public Long2ObjectMap<GhostBlock> getBlockStates() {
@@ -53,6 +55,11 @@ public final class GhostLevelImpl implements GhostLevel, DelegatedBlockAndTintGe
     @Override
     public Level reality() {
         return reality;
+    }
+
+    @Override
+    public Level ghosted() {
+        return ghosted;
     }
 
     @Override
