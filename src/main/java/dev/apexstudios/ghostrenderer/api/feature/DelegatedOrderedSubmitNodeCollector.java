@@ -16,8 +16,8 @@ import net.minecraft.client.renderer.item.ItemStackRenderState;
 import net.minecraft.client.renderer.rendertype.RenderType;
 import net.minecraft.client.renderer.state.level.CameraRenderState;
 import net.minecraft.client.renderer.state.level.QuadParticleRenderState;
-import net.minecraft.client.renderer.texture.TextureAtlasSprite;
-import net.minecraft.client.resources.model.geometry.BakedQuad;
+import net.minecraft.client.renderer.texture.UvMapping;
+import net.minecraft.client.resources.model.geometry.ItemQuads;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.world.item.ItemDisplayContext;
@@ -46,6 +46,11 @@ public interface DelegatedOrderedSubmitNodeCollector extends OrderedSubmitNodeCo
     }
 
     @Override
+    default void submitTextBackground(PoseStack poseStack, float x0, float y0, float x1, float y1, int color, Font.DisplayMode displayMode, int lightCoords) {
+        delegate().submitTextBackground(poseStack, x0, y0, x1, y1, color, displayMode, lightCoords);
+    }
+
+    @Override
     default void submitFlame(PoseStack poseStack, EntityRenderState renderState, Quaternionf rotation) {
         delegate().submitFlame(poseStack, renderState, rotation);
     }
@@ -56,8 +61,13 @@ public interface DelegatedOrderedSubmitNodeCollector extends OrderedSubmitNodeCo
     }
 
     @Override
-    default <S> void submitModel(Model<? super S> model, S state, PoseStack poseStack, RenderType renderType, int lightCoords, int overlayCoords, int tintedColor, @Nullable TextureAtlasSprite sprite, int outlineColor, ModelFeatureRenderer.@Nullable CrumblingOverlay crumblingOverlay) {
-        delegate().submitModel(model, state, poseStack, renderType, lightCoords, overlayCoords, tintedColor, sprite, outlineColor, crumblingOverlay);
+    default <S> void submitModel(Model<? super S> model, S state, PoseStack poseStack, RenderType renderType, int lightCoords, int overlayCoords, int tintedColor, @Nullable UvMapping uvMapping, int outlineColor) {
+        delegate().submitModel(model, state, poseStack, renderType, lightCoords, overlayCoords, tintedColor, uvMapping, outlineColor);
+    }
+
+    @Override
+    default <S> void submitCrumblingOverlay(Model<? super S> model, S state, PoseStack poseStack, RenderType renderType, int lightCoords, int overlayCoords, int tintedColor, ModelFeatureRenderer.CrumblingOverlay crumblingOverlay) {
+        delegate().submitCrumblingOverlay(model, state, poseStack, renderType, lightCoords, overlayCoords, tintedColor, crumblingOverlay);
     }
 
     @Override
@@ -71,8 +81,8 @@ public interface DelegatedOrderedSubmitNodeCollector extends OrderedSubmitNodeCo
     }
 
     @Override
-    default void submitBreakingBlockModel(PoseStack poseStack, List<BlockStateModelPart> parts, int progress) {
-        delegate().submitBreakingBlockModel(poseStack, parts, progress);
+    default void submitBreakingBlockModel(PoseStack poseStack, List<BlockStateModelPart> parts, int progress, boolean isBlockTranslucent) {
+        delegate().submitBreakingBlockModel(poseStack, parts, progress, isBlockTranslucent);
     }
 
     @Override
@@ -81,7 +91,7 @@ public interface DelegatedOrderedSubmitNodeCollector extends OrderedSubmitNodeCo
     }
 
     @Override
-    default void submitItem(PoseStack poseStack, ItemDisplayContext displayContext, int lightCoords, int overlayCoords, int outlineColor, int[] tintLayers, List<BakedQuad> quads, ItemStackRenderState.FoilType foilType) {
+    default void submitItem(PoseStack poseStack, ItemDisplayContext displayContext, int lightCoords, int overlayCoords, int outlineColor, int[] tintLayers, ItemQuads quads, ItemStackRenderState.FoilType foilType) {
         delegate().submitItem(poseStack, displayContext, lightCoords, overlayCoords, outlineColor, tintLayers, quads, foilType);
     }
 

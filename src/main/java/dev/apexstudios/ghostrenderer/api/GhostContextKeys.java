@@ -3,7 +3,10 @@ package dev.apexstudios.ghostrenderer.api;
 import com.google.common.collect.ImmutableList;
 import com.mojang.blaze3d.vertex.PoseStack;
 import dev.apexstudios.ghostrenderer.core.GhostFeatureRenderer;
+import dev.apexstudios.ghostrenderer.core.GhostSubmitNodeCollector;
+import dev.apexstudios.ghostrenderer.core.level.GhostBlockEntity;
 import dev.apexstudios.ghostrenderer.core.level.GhostBlockEntityRenderState;
+import dev.apexstudios.ghostrenderer.core.level.GhostEntity;
 import dev.apexstudios.ghostrenderer.core.level.GhostEntityRenderState;
 import dev.apexstudios.ghostrenderer.core.level.GhostLevelImpl;
 import dev.apexstudios.ghostrenderer.core.level.GhostLevelRenderState;
@@ -28,25 +31,28 @@ public record GhostContextKeys(
 ) {
     public void extract(LevelRenderState levelRenderState, float partialTicks, GhostLevel level) {
         var internal = (GhostLevelImpl) level;
-        levelRenderState.setRenderData(blocks, new GhostLevelRenderState(Long2ObjectMaps.unmodifiable(internal.getBlockStates()), internal));
-        levelRenderState.setRenderData(blockEntities, extractBlockEntities(levelRenderState, partialTicks, internal));
-        levelRenderState.setRenderData(entities, extractEntites(levelRenderState, partialTicks, internal));
+        levelRenderState.setRenderData(blocks, new GhostLevelRenderState(Long2ObjectMaps.unmodifiable(internal.getBlockStates()), internal, internal.isValid()));
+        levelRenderState.setRenderData(blockEntities, extractBlockEntities(levelRenderState, partialTicks, internal.getBlockEntities().values()));
+        levelRenderState.setRenderData(entities, extractEntites(levelRenderState, partialTicks, internal.getEntities()));
     }
 
-    public void submit(SubmitNodeCollector nodeCollector, PoseStack poseStack, LevelRenderState levelRenderState) {
-        var validCollector = new GhostSubmitNodeCollector(nodeCollector, true);
-        var invalidCollector = new GhostSubmitNodeCollector(nodeCollector, false);
+    public void submit(SubmitNodeCollector nodeCollector, PoseStack poseStack, LevelRenderState levelRenderState, GhostProperties properties) {
+        var validCollector = new GhostSubmitNodeCollector(nodeCollector, true, properties);
+        var invalidCollector = new GhostSubmitNodeCollector(nodeCollector, false, properties);
 
-        submitBlockStates(nodeCollector, poseStack, levelRenderState, levelRenderState.getRenderData(blocks));
-        submitBlockEntities(validCollector, invalidCollector, poseStack, levelRenderState, levelRenderState.getRenderData(blockEntities));
-        submitEntities(validCollector, invalidCollector, poseStack, levelRenderState, levelRenderState.getRenderData(entities));
+        var ghost = levelRenderState.getRenderData(blocks);
+        var globalIsValid = ghost == null || ghost.isValid();
+
+        submitBlockStates(nodeCollector, poseStack, levelRenderState, ghost, properties);
+        submitBlockEntities(validCollector, invalidCollector, poseStack, levelRenderState, levelRenderState.getRenderData(blockEntities), properties, globalIsValid);
+        submitEntities(validCollector, invalidCollector, poseStack, levelRenderState, levelRenderState.getRenderData(entities), properties, globalIsValid);
     }
 
-    private List<GhostBlockEntityRenderState> extractBlockEntities(LevelRenderState levelRenderState, float partialTicks, GhostLevelImpl level) {
+    private List<GhostBlockEntityRenderState> extractBlockEntities(LevelRenderState levelRenderState, float partialTicks, Iterable<GhostBlockEntity> blockEntities) {
         var renderStates = ImmutableList.<GhostBlockEntityRenderState>builder();
         var dispatcher = Minecraft.getInstance().getBlockEntityRenderDispatcher();
 
-        for(var blockEntity : level.getBlockEntities().values()) {
+        for(var blockEntity : blockEntities) {
             var renderState = blockEntity.extract(dispatcher, partialTicks, levelRenderState.cameraRenderState.pos);
 
             if(renderState != null) {
@@ -59,11 +65,11 @@ public record GhostContextKeys(
         return renderStates.build();
     }
 
-    private List<GhostEntityRenderState> extractEntites(LevelRenderState levelRenderState, float partialTicks, GhostLevelImpl level) {
+    private List<GhostEntityRenderState> extractEntites(LevelRenderState levelRenderState, float partialTicks, Iterable<GhostEntity> entities) {
         var renderStates = ImmutableList.<GhostEntityRenderState>builder();
         var dispatcher = Minecraft.getInstance().getEntityRenderDispatcher();
 
-        for(var entity : level.getEntities()) {
+        for(var entity : entities) {
             var renderState = entity.extract(dispatcher, partialTicks);
 
             if(renderState != null) {
@@ -76,7 +82,7 @@ public record GhostContextKeys(
         return renderStates.build();
     }
 
-    private void submitBlockStates(SubmitNodeCollector nodeCollector, PoseStack poseStack, LevelRenderState levelRenderState, @Nullable GhostLevelRenderState renderState) {
+    private void submitBlockStates(SubmitNodeCollector nodeCollector, PoseStack poseStack, LevelRenderState levelRenderState, @Nullable GhostLevelRenderState renderState, GhostProperties properties) {
         if(renderState == null) {
             return;
         }
@@ -84,12 +90,12 @@ public record GhostContextKeys(
         poseStack.pushPose();
         poseStack.translate(levelRenderState.cameraRenderState.pos.scale(-1D));
 
-        nodeCollector.submitSpecial(RenderPhaseKeys.ALWAYS_ON_TOP, new GhostFeatureRenderer.Submit(poseStack.last().copy(), renderState));
+        nodeCollector.submitSpecial(properties.alwaysOnTop() ? RenderPhaseKeys.ALWAYS_ON_TOP : RenderPhaseKeys.AFTER_TERRAIN, new GhostFeatureRenderer.Submit(poseStack.last().copy(), renderState, properties));
 
         poseStack.popPose();
     }
 
-    private void submitBlockEntities(SubmitNodeCollector validCollector, SubmitNodeCollector invalidCollector, PoseStack poseStack, LevelRenderState levelRenderState, @Nullable List<GhostBlockEntityRenderState> renderStates) {
+    private void submitBlockEntities(SubmitNodeCollector validCollector, SubmitNodeCollector invalidCollector, PoseStack poseStack, LevelRenderState levelRenderState, @Nullable List<GhostBlockEntityRenderState> renderStates, GhostProperties properties, boolean globalIsValid) {
         if(renderStates == null || renderStates.isEmpty()) {
             return;
         }
@@ -102,6 +108,8 @@ public record GhostContextKeys(
         for(var renderState : renderStates) {
             var blockEntityRenderState = renderState.renderState();
             var renderer = Objects.requireNonNull(dispatcher.getRenderer(blockEntityRenderState));
+            var isValid = properties.validPerRender() ? renderState.isValid() : globalIsValid;
+            var nodeCollector = isValid ? validCollector : invalidCollector;
 
             poseStack.pushPose();
             poseStack.translate(
@@ -110,7 +118,7 @@ public record GhostContextKeys(
                     blockEntityRenderState.blockPos.getZ()
             );
 
-            renderer.submit(blockEntityRenderState, poseStack, renderState.isValid() ? validCollector : invalidCollector, levelRenderState.cameraRenderState);
+            renderer.submit(blockEntityRenderState, poseStack, nodeCollector, levelRenderState.cameraRenderState);
             poseStack.popPose();
         }
 
@@ -118,7 +126,7 @@ public record GhostContextKeys(
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})
-    private void submitEntities(SubmitNodeCollector validCollector, SubmitNodeCollector invalidCollector, PoseStack poseStack, LevelRenderState levelRenderState, @Nullable List<GhostEntityRenderState> renderStates) {
+    private void submitEntities(SubmitNodeCollector validCollector, SubmitNodeCollector invalidCollector, PoseStack poseStack, LevelRenderState levelRenderState, @Nullable List<GhostEntityRenderState> renderStates, GhostProperties properties, boolean globalIsValid) {
         if(renderStates == null || renderStates.isEmpty()) {
             return;
         }
@@ -132,7 +140,9 @@ public record GhostContextKeys(
             var entityRenderState = renderState.renderState();
             // should be safe as this renderer was used to extract the state earlier
             var renderer = (EntityRenderer) Objects.requireNonNull(dispatcher.getRenderer(entityRenderState));
-            submitEntity(renderState.isValid() ? validCollector : invalidCollector, poseStack, levelRenderState.cameraRenderState, renderer, entityRenderState);
+            var isValid = properties.validPerRender() ? renderState.isValid() : globalIsValid;
+            var nodeCollector = isValid ? validCollector : invalidCollector;
+            submitEntity(nodeCollector, poseStack, levelRenderState.cameraRenderState, renderer, entityRenderState);
         }
 
         poseStack.popPose();
