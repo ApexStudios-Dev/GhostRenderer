@@ -10,8 +10,8 @@ import com.mojang.renderpearl.api.commands.RenderPass;
 import com.mojang.renderpearl.api.pipeline.PrimitiveTopology;
 import com.mojang.renderpearl.api.textures.AddressMode;
 import com.mojang.renderpearl.api.textures.FilterMode;
+import dev.apexstudios.ghostrenderer.api.GhostProperties;
 import dev.apexstudios.ghostrenderer.api.GhostRenderer;
-import dev.apexstudios.ghostrenderer.api.GhostVertexConsumer;
 import dev.apexstudios.ghostrenderer.core.level.GhostLevelRenderState;
 import java.util.ArrayList;
 import java.util.List;
@@ -47,31 +47,34 @@ public final class GhostFeatureRenderer implements FeatureRenderer<GhostFeatureR
             return;
         }
 
-        var renderer = rendererCache.apply(
-                Minecraft.getInstance().options.ambientOcclusion().get(),
-                context.blockColors()
-        );
+        var vanillaAO = Minecraft.getInstance().options.ambientOcclusion().get();
+        var blockColors = context.blockColors();
 
         var vertexBuffer = context.stagedVertexBuffer();
         var draw = vertexBuffer.appendDraw(DefaultVertexFormat.BLOCK, PrimitiveTopology.QUADS, VertexSorting.DISTANCE_TO_ORIGIN);
         var vanillaBuffer = vertexBuffer.getVertexBuilder(draw);
-        var validBuffer = new GhostVertexConsumer(vanillaBuffer, true);
-        var invalidBuffer = new GhostVertexConsumer(vanillaBuffer, false);
 
         for(var submit : submits) {
+            var ghostAO = submit.properties.useAmbientOcclusion();
+            var useAO = ghostAO.isDefault() ? vanillaAO : ghostAO.isTrue();
+            var renderer = rendererCache.apply(useAO, blockColors);
             var tintGetter = submit.renderState.tintGetter();
+            var validBuffer = new GhostVertexConsumer(vanillaBuffer, true, submit.properties);
+            var invalidBuffer = new GhostVertexConsumer(vanillaBuffer, false, submit.properties);
+            var globalIsValid = submit.renderState.isValid();
 
             for(var entry : submit.renderState.blockStates().long2ObjectEntrySet()) {
                 var pos = BlockPos.of(entry.getLongKey());
                 var ghost = entry.getValue();
                 var blockState = ghost.blockState();
-
                 var blockPos = submit.pose.copy();
+                var isValid = submit.properties.validPerRender() ? ghost.isValid() : globalIsValid;
+                var buffer = isValid ? validBuffer : invalidBuffer;
 
                 blockPos.translate(pos.getX(), pos.getY(), pos.getZ());
 
                 renderer.tesselateBlock(
-                        putQuad(ghost.isValid() ? validBuffer : invalidBuffer, blockPos),
+                        putQuad(buffer, blockPos),
                         0F, 0F, 0F,
                         tintGetter,
                         pos,
@@ -137,7 +140,8 @@ public final class GhostFeatureRenderer implements FeatureRenderer<GhostFeatureR
 
     public record Submit(
             PoseStack.Pose pose,
-            GhostLevelRenderState renderState
+            GhostLevelRenderState renderState,
+            GhostProperties properties
     ) implements TranslucentSubmit {
         @Override
         public float distanceToCameraSq() {

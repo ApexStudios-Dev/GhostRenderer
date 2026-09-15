@@ -1,7 +1,5 @@
 package dev.apexstudios.ghostrenderer.api;
 
-import dev.apexstudios.ghostrenderer.core.level.GhostLevelImpl;
-import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.item.ItemStack;
@@ -37,8 +35,4 @@ public interface GhostLevel {
     // call this method after summoning your entities
     // but before calling `addEntity`
     void fixClientEntity(Entity entity);
-
-    static GhostLevel create(ClientLevel reality) {
-        return new GhostLevelImpl(reality);
-    }
 }

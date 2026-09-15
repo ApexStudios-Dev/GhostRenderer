@@ -6,7 +6,8 @@ import net.minecraft.client.renderer.block.BlockAndTintGetter;
 
 public record GhostLevelRenderState(
         Long2ObjectMap<GhostBlock> blockStates,
-        BlockAndTintGetter tintGetter
+        BlockAndTintGetter tintGetter,
+        boolean isValid
 ) {
     public GhostLevelRenderState {
         blockStates = Long2ObjectMaps.unmodifiable(blockStates);

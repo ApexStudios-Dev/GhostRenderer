@@ -1,7 +1,8 @@
-package dev.apexstudios.ghostrenderer.api;
+package dev.apexstudios.ghostrenderer.core;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import dev.apexstudios.ghostrenderer.api.GhostProperties;
 import dev.apexstudios.ghostrenderer.api.feature.DelegatedOrderedSubmitNodeCollector;
 import java.util.function.BiConsumer;
 import net.minecraft.Optionull;
@@ -20,11 +21,13 @@ import org.jspecify.annotations.Nullable;
 
 public sealed class GhostOrderedSubmitNodeCollector implements DelegatedOrderedSubmitNodeCollector permits GhostSubmitNodeCollector {
     private final OrderedSubmitNodeCollector delegate;
-    private final boolean isValid;
+    protected final boolean isValid;
+    protected final GhostProperties properties;
 
-    public GhostOrderedSubmitNodeCollector(OrderedSubmitNodeCollector delegate, boolean isValid) {
+    public GhostOrderedSubmitNodeCollector(OrderedSubmitNodeCollector delegate, boolean isValid, GhostProperties properties) {
         this.delegate = delegate;
         this.isValid = isValid;
+        this.properties = properties;
     }
 
     public void submitGhostGeometry(PoseStack poseStack, RenderType renderType, @Nullable TextureAtlasSprite sprite, SubmitNodeCollector.CustomGeometryRenderer renderer) {
@@ -42,7 +45,7 @@ public sealed class GhostOrderedSubmitNodeCollector implements DelegatedOrderedS
     }
 
     public void submitGhostGeometryStack(PoseStack poseStack, Identifier atlas, @Nullable UvMapping uvMapping, BiConsumer<PoseStack, VertexConsumer> renderer) {
-        submitSpecial(RenderPhaseKeys.ALWAYS_ON_TOP, new CustomFeatureRenderer.Submit(
+        submitSpecial(properties.alwaysOnTop() ? RenderPhaseKeys.ALWAYS_ON_TOP : RenderPhaseKeys.AFTER_TERRAIN, new CustomFeatureRenderer.Submit(
                 poseStack.last().copy(),
                 RenderTypes.entityTranslucentCull(atlas),
                 (pose, buffer) -> {
@@ -52,14 +55,11 @@ public sealed class GhostOrderedSubmitNodeCollector implements DelegatedOrderedS
 
                     renderer.accept(newPoseStack, new GhostVertexConsumer(
                             Optionull.mapOrDefault(uvMapping, uv -> uv.wrap(buffer), buffer),
-                            isValid
+                            isValid,
+                            properties
                     ));
                 }
         ));
-    }
-
-    public boolean isValid() {
-        return isValid;
     }
 
     @Override
