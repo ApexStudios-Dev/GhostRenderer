@@ -1,6 +1,7 @@
 package dev.apexstudios.ghostrenderer.core.level;
 
 import dev.apexstudios.ghostrenderer.api.GhostLevel;
+import dev.apexstudios.ghostrenderer.api.GhostProperties;
 import dev.apexstudios.ghostrenderer.api.level.DelegatedBlockAndTintGetter;
 import dev.apexstudios.ghostrenderer.api.level.fake.FakeLevel;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
@@ -11,6 +12,10 @@ import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.block.BlockAndTintGetter;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.PostSpawnProcessor;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.EntityBlock;
@@ -28,14 +33,16 @@ public final class GhostLevelImpl implements GhostLevel, DelegatedBlockAndTintGe
     private final FakeLevel reality;
     private final BlockAndTintGetter delegate;
     private final GhostedLevel ghosted;
+    private final GhostProperties properties;
 
     private final Long2ObjectMap<GhostBlock> blockStates = new Long2ObjectOpenHashMap<>();
     private final Long2ObjectMap<GhostBlockEntity> blockEntities = new Long2ObjectOpenHashMap<>();
     private final List<GhostEntity> entities = new ArrayList<>();
-    private int entityCounter = 1; // 0 == invalid entity | Entity.INVALID_ENTITY_ID
 
-    public GhostLevelImpl(ClientLevel reality) {
+    public GhostLevelImpl(ClientLevel reality, GhostProperties properties) {
         this.reality = new FakeLevel(reality);
+        this.properties = properties;
+
         delegate = reality;
         ghosted = new GhostedLevel(this);
     }
@@ -50,6 +57,28 @@ public final class GhostLevelImpl implements GhostLevel, DelegatedBlockAndTintGe
 
     public List<GhostEntity> getEntities() {
         return entities;
+    }
+
+    public boolean isValid() {
+        for(var block : blockStates.values()) {
+            if(!block.isValid()) {
+                return false;
+            }
+        }
+
+        for(var blockEntity : blockEntities.values()) {
+            if(!blockEntity.isValid()) {
+                return false;
+            }
+        }
+
+        for(var entity : entities) {
+            if(!entity.isValid()) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     @Override
@@ -76,6 +105,10 @@ public final class GhostLevelImpl implements GhostLevel, DelegatedBlockAndTintGe
     @SuppressWarnings("DataFlowIssue")
     @Override
     public void setBlockEntity(BlockPos pos, BlockState blockState, @Nullable ItemStack components, boolean isValid) {
+        if(!properties.renderBlockEntities()) {
+            return;
+        }
+
         var key = pos.asLong();
 
         if(blockEntities.containsKey(key)) {
@@ -116,14 +149,45 @@ public final class GhostLevelImpl implements GhostLevel, DelegatedBlockAndTintGe
 
     @Override
     public void addEntity(Entity entity, boolean isValid) {
+        if(!properties.renderEntities()) {
+            entity.discard();
+            return;
+        }
+
+        // due to entities being constructed server side
+        // and synced to the client, some properties are
+        // only initialized and set there and need manually
+        // applying for our client usages
+        // call this method after summoning your entities
+        // but before calling `addEntity`
+        entity.setId(entities.size() + 1); // 0 == invalid entity | Entity.INVALID_ENTITY_ID
         entities.add(new GhostEntity(entity, isValid));
     }
 
     @Override
-    public void fixClientEntity(Entity entity) {
-        entity.setId(entityCounter);
+    public @Nullable <TEntity extends Entity> TEntity createEntity(
+            EntityType<TEntity> entityType,
+            @Nullable ItemStack stack,
+            @Nullable LivingEntity user,
+            BlockPos spawnPos,
+            EntitySpawnReason spawnReason,
+            boolean tryMoveDown,
+            boolean movedUp
+    ) {
+        if(!properties.renderEntities()) {
+            return null;
+        }
 
-        entityCounter++;
+        return GhostLevel.super.createEntity(entityType, stack, user, spawnPos, spawnReason, tryMoveDown, movedUp);
+    }
+
+    @Override
+    public @Nullable <TEntity extends Entity> TEntity createEntity(EntityType<TEntity> entityType, @Nullable PostSpawnProcessor<TEntity> postSpawnConfig, BlockPos spawnPos, EntitySpawnReason spawnReason, boolean tryMoveDown, boolean movedUp) {
+        if(!properties.renderEntities()) {
+            return null;
+        }
+
+        return GhostLevel.super.createEntity(entityType, postSpawnConfig, spawnPos, spawnReason, tryMoveDown, movedUp);
     }
 
     @Override

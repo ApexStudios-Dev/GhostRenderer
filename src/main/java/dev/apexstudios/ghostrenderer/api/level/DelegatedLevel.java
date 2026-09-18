@@ -14,12 +14,10 @@ import net.minecraft.world.attribute.EnvironmentAttributeSystem;
 import net.minecraft.world.clock.ClockManager;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.item.alchemy.PotionBrewing;
 import net.minecraft.world.item.crafting.RecipeAccess;
 import net.minecraft.world.level.ExplosionDamageCalculator;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.entity.FuelValues;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.entity.LevelEntityGetter;
 import net.minecraft.world.level.saveddata.maps.MapId;
@@ -136,15 +134,5 @@ public class DelegatedLevel extends Level implements DelegatedAttachmentHolder, 
     @Override
     public EnvironmentAttributeSystem environmentAttributes() {
         return delegate().environmentAttributes();
-    }
-
-    @Override
-    public PotionBrewing potionBrewing() {
-        return delegate().potionBrewing();
-    }
-
-    @Override
-    public FuelValues fuelValues() {
-        return delegate().fuelValues();
     }
 }

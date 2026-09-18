@@ -2,6 +2,7 @@ package dev.apexstudios.ghostrenderer.api;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import dev.apexstudios.ghostrenderer.core.GhostFeatureRenderer;
+import dev.apexstudios.ghostrenderer.core.level.GhostLevelImpl;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.feature.FeatureRendererType;
@@ -29,21 +30,21 @@ public interface GhostRenderer {
         setRenderData(event.getRenderState(), event.getDeltaTracker().getGameTimeDeltaPartialTick(false), keys, level);
     }
 
-    static void submit(SubmitNodeCollector nodeCollector, PoseStack poseStack, LevelRenderState levelRenderState, GhostContextKeys keys) {
-        keys.submit(nodeCollector, poseStack, levelRenderState);
+    static void submit(SubmitNodeCollector nodeCollector, PoseStack poseStack, LevelRenderState levelRenderState, GhostContextKeys keys, GhostProperties properties) {
+        keys.submit(nodeCollector, poseStack, levelRenderState, properties);
     }
 
-    static void submit(SubmitCustomGeometryEvent event, GhostContextKeys keys) {
-        submit(event.getSubmitNodeCollector(), event.getPoseStack(), event.getLevelRenderState(), keys);
+    static void submit(SubmitCustomGeometryEvent event, GhostContextKeys keys, GhostProperties properties) {
+        submit(event.getSubmitNodeCollector(), event.getPoseStack(), event.getLevelRenderState(), keys, properties);
     }
 
-    static void registerEvents(GhostContextKeys keys, TriPredicate<GhostLevel, Player, BlockHitResult> extractor) {
+    static void registerEvents(GhostContextKeys keys, TriPredicate<GhostLevel, Player, BlockHitResult> extractor, GhostProperties properties) {
         NeoForge.EVENT_BUS.addListener(ExtractLevelRenderStateEvent.class, event -> {
             var level = event.getLevel();
             var client = Minecraft.getInstance();
             var player = client.player;
 
-            if(player == null || player.isSpectator()) {
+            if(player == null || player.isSpectator() || !properties.renderForPlayer(player)) {
                 return;
             }
 
@@ -65,18 +66,18 @@ public interface GhostRenderer {
                 }
             }
 
-            var ghostLevel = GhostLevel.create(level);
+            var ghostLevel = new GhostLevelImpl(level, properties);
 
             if(extractor.test(ghostLevel, player, hitResult)) {
                 setRenderData(event, keys, ghostLevel);
             }
         });
 
-        NeoForge.EVENT_BUS.addListener(SubmitCustomGeometryEvent.class, event -> submit(event, keys));
+        NeoForge.EVENT_BUS.addListener(SubmitCustomGeometryEvent.class, event -> submit(event, keys, properties));
     }
 
-    static void registerEvents(String namespace, TriPredicate<GhostLevel, Player, BlockHitResult> extractor) {
-        registerEvents(GhostContextKeys.create(namespace), extractor);
+    static void registerEvents(String namespace, TriPredicate<GhostLevel, Player, BlockHitResult> extractor, GhostProperties properties) {
+        registerEvents(GhostContextKeys.create(namespace), extractor, properties);
     }
 
     static Identifier identifier(String identifier) {
